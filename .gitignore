@@ -20,6 +20,9 @@ node_modules/
 frontend/dist/
 backend/data/*.db
 
+# Embedding models (downloaded at runtime, ~400MB)
+backend/data/embedding_models/
+
 # Environment
 .env
 .env.local

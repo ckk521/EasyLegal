@@ -4,6 +4,13 @@ RAG 服务模块 - 向量检索
 import os
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
+from pathlib import Path
+
+# 设置 HuggingFace 镜像（国内网络加速）
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+# 优先使用本地缓存，避免每次都联网验证
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -21,6 +28,9 @@ class RAGService:
     _embeddings = None
     _vectorstore = None
 
+    # 模型缓存目录（项目根目录下）
+    MODEL_CACHE_DIR = settings.DATA_DIR / "embedding_models"
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -32,6 +42,9 @@ class RAGService:
         if cls._embeddings is not None:
             return cls._embeddings
 
+        # 确保模型缓存目录存在
+        cls.MODEL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
         # 获取配置
         model_name = "m3e-base"  # 默认值
         if db:
@@ -39,10 +52,11 @@ class RAGService:
             if config:
                 model_name = config.model_name
 
-        # 使用 HuggingFace 模型
+        # 使用 HuggingFace 模型，指定缓存目录
         # 支持 m3e-base 等中文模型
         cls._embeddings = HuggingFaceEmbeddings(
             model_name=model_name,
+            cache_folder=str(cls.MODEL_CACHE_DIR),  # 模型下载到项目目录
             model_kwargs={'device': 'cpu'},  # CPU 模式，如需 GPU 改为 'cuda'
             encode_kwargs={'normalize_embeddings': True}
         )
