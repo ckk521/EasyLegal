@@ -1,0 +1,8 @@
+"""拒绝话术模块"""
+from app.prompts.rejection.templates import REJECTION_TEMPLATES, REDIRECT_TEMPLATES, SERVICE_RECOMMENDATIONS
+
+__all__ = [
+    'REJECTION_TEMPLATES',
+    'REDIRECT_TEMPLATES',
+    'SERVICE_RECOMMENDATIONS',
+]
