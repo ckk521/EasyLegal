@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db, SessionLocal
 from app.services.staff_service import StaffService
-from app.api import auth, admin, staff_auth, config, chat
+from app.api import auth, admin, staff_auth, config, chat, document
 
 
 @asynccontextmanager
@@ -52,6 +52,7 @@ app.include_router(staff_auth.router)  # B端员工认证
 app.include_router(admin.router)       # B端管理
 app.include_router(config.router)      # 配置管理
 app.include_router(chat.router)        # C端对话
+app.include_router(document.router)    # 文档管理
 
 
 @app.get("/")

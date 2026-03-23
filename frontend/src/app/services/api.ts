@@ -475,3 +475,153 @@ export const configApi = {
     });
   },
 };
+
+// ==================== 文档管理 API ====================
+
+export interface DocumentItem {
+  id: number;
+  name: string;
+  file_path: string;
+  file_type: string;
+  doc_type: string;
+  content: string | null;
+  chunk_count: number;
+  is_indexed: boolean;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateItem {
+  id: number;
+  name: string;
+  contract_type: string;
+  file_path: string;
+  file_type: string;
+  content: string | null;
+  variables: string | null;
+  field_definition_id: number | null;
+  is_active: boolean;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FieldDefinitionItem {
+  id: number;
+  name: string;
+  contract_type: string;
+  fields: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const documentApi = {
+  // 获取文档列表
+  getDocuments: async (docType?: string): Promise<{ total: number; items: DocumentItem[] }> => {
+    const query = docType ? `?doc_type=${docType}` : '';
+    return request(`/api/admin/documents${query}`);
+  },
+
+  // 上传文档
+  uploadDocument: async (file: File, docType: string, name?: string, description?: string): Promise<DocumentItem> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('doc_type', docType);
+    if (name) formData.append('name', name);
+    if (description) formData.append('description', description);
+
+    const response = await fetch(`${API_BASE_URL}/api/admin/documents/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || '上传失败');
+    }
+
+    return response.json();
+  },
+
+  // 索引文档到向量库
+  indexDocument: async (docId: number): Promise<{ message: string; chunk_count: number }> => {
+    return request(`/api/admin/documents/${docId}/index`, { method: 'POST' });
+  },
+
+  // 删除文档
+  deleteDocument: async (docId: number): Promise<void> => {
+    return request(`/api/admin/documents/${docId}`, { method: 'DELETE' });
+  },
+
+  // 获取模板列表
+  getTemplates: async (contractType?: string): Promise<TemplateItem[]> => {
+    const query = contractType ? `?contract_type=${contractType}` : '';
+    return request(`/api/admin/documents/templates${query}`);
+  },
+
+  // 上传模板
+  uploadTemplate: async (file: File, name: string, contractType: string, description?: string): Promise<TemplateItem> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', name);
+    formData.append('contract_type', contractType);
+    if (description) formData.append('description', description);
+
+    const response = await fetch(`${API_BASE_URL}/api/admin/documents/templates/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || '上传失败');
+    }
+
+    return response.json();
+  },
+
+  // 删除模板
+  deleteTemplate: async (templateId: number): Promise<void> => {
+    return request(`/api/admin/documents/templates/${templateId}`, { method: 'DELETE' });
+  },
+
+  // 获取字段定义列表
+  getFieldDefinitions: async (contractType?: string): Promise<FieldDefinitionItem[]> => {
+    const query = contractType ? `?contract_type=${contractType}` : '';
+    return request(`/api/admin/documents/field-definitions${query}`);
+  },
+
+  // 创建字段定义
+  createFieldDefinition: async (data: { name: string; contract_type: string; fields: string }): Promise<FieldDefinitionItem> => {
+    return request('/api/admin/documents/field-definitions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 更新字段定义
+  updateFieldDefinition: async (id: number, data: Partial<{ name: string; contract_type: string; fields: string }>): Promise<FieldDefinitionItem> => {
+    return request(`/api/admin/documents/field-definitions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 删除字段定义
+  deleteFieldDefinition: async (id: number): Promise<void> => {
+    return request(`/api/admin/documents/field-definitions/${id}`, { method: 'DELETE' });
+  },
+
+  // 初始化租赁合同字段定义
+  initLeaseFieldDefinition: async (): Promise<{ message: string; id: number }> => {
+    return request('/api/admin/documents/field-definitions/init-lease', { method: 'POST' });
+  },
+};

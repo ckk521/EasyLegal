@@ -30,5 +30,5 @@ def get_db():
 
 def init_db():
     """初始化数据库（创建所有表）"""
-    from app.models import user  # 导入模型以注册表
+    from app.models import user, staff, config, document  # 导入模型以注册表
     Base.metadata.create_all(bind=engine)
