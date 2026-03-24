@@ -10,7 +10,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { toast } from 'sonner';
 
-const API_BASE_URL = 'http://localhost:8001';
+const API_BASE_URL = 'http://localhost:8002';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
@@ -29,6 +29,7 @@ interface ContractTemplateEditorProps {
   }>;
   draftId?: number;
   draftValues?: Record<string, string>;
+  sessionId?: number;  // 当前会话ID
   onSaveDraft: (values: Record<string, string>) => void;
   onSubmit: (values: Record<string, string>) => void;
   onCancel: () => void;
@@ -41,6 +42,7 @@ export function ContractTemplateEditor({
   fields,
   draftId: externalDraftId,
   draftValues = {},
+  sessionId,
   onSaveDraft,
   onSubmit,
   onCancel
@@ -123,7 +125,8 @@ export function ContractTemplateEditor({
           },
           body: JSON.stringify({
             contract_type: contractType,
-            field_values: valuesToSave
+            field_values: valuesToSave,
+            session_id: sessionId  // 传入会话ID
           })
         });
         if (response.ok) {
@@ -186,7 +189,8 @@ export function ContractTemplateEditor({
           },
           body: JSON.stringify({
             contract_type: contractType,
-            field_values: values
+            field_values: values,
+            session_id: sessionId  // 传入会话ID
           })
         });
 
