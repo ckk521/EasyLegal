@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   Plus, Upload, Trash2, Edit2, FileText, Database, Loader2,
-  FileCheck, AlertCircle, ChevronRight, Save, X, BookOpen
+  FileCheck, AlertCircle, ChevronRight, Save, X, BookOpen, Eye
 } from 'lucide-react';
 import {
   documentApi,
@@ -67,7 +67,7 @@ export function RuleLibrary() {
 function TemplatesSection() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<TemplateItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -97,7 +97,6 @@ function TemplatesSection() {
       await documentApi.uploadTemplate(file, name, contractType);
       toast.success('模板上传成功');
       loadTemplates();
-      setShowUpload(false);
     } catch (error: any) {
       toast.error('上传失败: ' + error.message);
     }
@@ -105,6 +104,23 @@ function TemplatesSection() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleInitDefaults = async () => {
+    setIsLoading(true);
+    try {
+      const result = await documentApi.initDefaultTemplates();
+      if (result.created.length > 0) {
+        toast.success(`已创建 ${result.created.length} 个默认模板：${result.created.join('、')}`);
+      }
+      if (result.skipped.length > 0) {
+        toast.info(`${result.skipped.join('、')} 已存在，已跳过`);
+      }
+      loadTemplates();
+    } catch (error: any) {
+      toast.error('初始化失败: ' + error.message);
+    }
+    setIsLoading(false);
   };
 
   const handleDelete = async (id: number) => {
@@ -122,21 +138,31 @@ function TemplatesSection() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-slate-600">上传合同模板供智能体使用，支持 PDF、Word、Markdown 格式</p>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-        >
-          <Upload className="w-4 h-4" />
-          上传模板
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.docx,.doc,.md,.txt"
-          className="hidden"
-          onChange={handleUpload}
-        />
+        <p className="text-sm text-slate-600">管理合同模板，用户对话时将使用对应模板生成合同</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleInitDefaults}
+            disabled={isLoading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
+          >
+            <Database className="w-4 h-4" />
+            初始化默认模板
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            上传模板
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.doc,.md,.txt"
+            className="hidden"
+            onChange={handleUpload}
+          />
+        </div>
       </div>
 
       {isLoading ? (
@@ -147,7 +173,7 @@ function TemplatesSection() {
         <div className="text-center py-12 bg-slate-50 rounded-lg">
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500">暂无模板</p>
-          <p className="text-sm text-slate-400 mt-1">点击上方按钮上传合同模板</p>
+          <p className="text-sm text-slate-400 mt-1">点击「初始化默认模板」创建预置模板，或上传自定义模板</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -159,13 +185,26 @@ function TemplatesSection() {
                 </div>
                 <div>
                   <h4 className="font-medium text-slate-900">{template.name}</h4>
-                  <p className="text-sm text-slate-500">{template.contract_type} · {template.file_type.toUpperCase()}</p>
+                  <p className="text-sm text-slate-500">
+                    {template.contract_type}
+                    {template.file_type && ` · ${template.file_type.toUpperCase()}`}
+                    {template.description && ` · ${template.description}`}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${template.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                   {template.is_active ? '已启用' : '已禁用'}
                 </span>
+                {template.content && (
+                  <button
+                    onClick={() => setPreviewTemplate(template)}
+                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    title="预览内容"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => handleDelete(template.id)}
                   className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -175,6 +214,28 @@ function TemplatesSection() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 预览弹窗 */}
+      {previewTemplate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-bold text-lg text-slate-900">{previewTemplate.name}</h3>
+              <button
+                onClick={() => setPreviewTemplate(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <pre className="whitespace-pre-wrap text-sm text-slate-700 font-mono bg-slate-50 p-4 rounded-lg">
+                {previewTemplate.content}
+              </pre>
+            </div>
+          </div>
         </div>
       )}
     </div>

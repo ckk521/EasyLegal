@@ -63,8 +63,18 @@ async function request<T>(
     ...options.headers,
   };
 
-  // 添加 token
-  const token = localStorage.getItem('token');
+  // 根据路由选择正确的token
+  // B端API使用 staff_token，C端API使用 user_token
+  let token: string | null = null;
+  if (endpoint.startsWith('/api/admin') || endpoint.startsWith('/api/staff')) {
+    token = localStorage.getItem('staff_token');
+  } else if (endpoint.startsWith('/api/auth') || endpoint.startsWith('/api/chat') || endpoint.startsWith('/api/contract')) {
+    token = localStorage.getItem('user_token');
+  } else {
+    // 默认使用 user_token（C端用户）
+    token = localStorage.getItem('user_token');
+  }
+
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
@@ -77,7 +87,15 @@ async function request<T>(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.detail || '请求失败');
+    // 处理不同类型的错误响应
+    let errorMsg = '请求失败';
+    if (typeof data.detail === 'string') {
+      errorMsg = data.detail;
+    } else if (data.detail && typeof data.detail === 'object') {
+      // Pydantic验证错误
+      errorMsg = JSON.stringify(data.detail);
+    }
+    throw new Error(errorMsg);
   }
 
   return data;
@@ -535,7 +553,7 @@ export const documentApi = {
     const response = await fetch(`${API_BASE_URL}/api/admin/documents/upload`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('staff_token')}`,
       },
       body: formData,
     });
@@ -575,7 +593,7 @@ export const documentApi = {
     const response = await fetch(`${API_BASE_URL}/api/admin/documents/templates/upload`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('staff_token')}`,
       },
       body: formData,
     });
@@ -591,6 +609,11 @@ export const documentApi = {
   // 删除模板
   deleteTemplate: async (templateId: number): Promise<void> => {
     return request(`/api/admin/documents/templates/${templateId}`, { method: 'DELETE' });
+  },
+
+  // 初始化默认模板
+  initDefaultTemplates: async (): Promise<{ message: string; created: string[]; skipped: string[] }> => {
+    return request('/api/admin/documents/templates/init-defaults', { method: 'POST' });
   },
 
   // 获取字段定义列表
@@ -623,5 +646,79 @@ export const documentApi = {
   // 初始化租赁合同字段定义
   initLeaseFieldDefinition: async (): Promise<{ message: string; id: number }> => {
     return request('/api/admin/documents/field-definitions/init-lease', { method: 'POST' });
+  },
+};
+
+// ==================== 合同草稿 API ====================
+
+export interface ContractDraftItem {
+  id: number;
+  contract_no: string;
+  contract_type: string;
+  title: string | null;
+  status: 'draft' | 'completed';
+  field_values: Record<string, string>;
+  fields_definition: Array<{
+    name: string;
+    label: string;
+    type: string;
+    required: boolean;
+    placeholder?: string;
+  }>;
+  template_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const contractDraftApi = {
+  // 获取用户所有草稿/合同列表
+  listDrafts: async (): Promise<ContractDraftItem[]> => {
+    return request('/api/contract-drafts/list');
+  },
+
+  // 获取待处理的草稿（最新未完成）
+  getPendingDraft: async (): Promise<ContractDraftItem | null> => {
+    return request('/api/contract-drafts/pending');
+  },
+
+  // 获取单个草稿详情
+  getDraft: async (draftId: number): Promise<ContractDraftItem> => {
+    return request(`/api/contract-drafts/${draftId}`);
+  },
+
+  // 创建草稿
+  createDraft: async (data: { contract_type: string; field_values?: Record<string, string> }): Promise<ContractDraftItem> => {
+    return request('/api/contract-drafts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 更新草稿（自动保存）
+  updateDraft: async (draftId: number, fieldValues: Record<string, string>): Promise<ContractDraftItem> => {
+    return request(`/api/contract-drafts/${draftId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ field_values: fieldValues }),
+    });
+  },
+
+  // 完成草稿
+  completeDraft: async (draftId: number): Promise<{ message: string; contract_id: number; contract_no: string }> => {
+    return request(`/api/contract-drafts/${draftId}/complete`, { method: 'POST' });
+  },
+
+  // 删除草稿
+  deleteDraft: async (draftId: number): Promise<{ message: string }> => {
+    return request(`/api/contract-drafts/${draftId}`, { method: 'DELETE' });
+  },
+
+  // 获取可用的合同类型
+  getContractTypes: async (): Promise<Array<{
+    contract_type: string;
+    name: string;
+    has_template: boolean;
+    has_field_definition: boolean;
+  }>> => {
+    return request('/api/contract-drafts/types');
   },
 };

@@ -19,5 +19,5 @@ class Staff(Base):
     first_login = Column(Boolean, default=True)  # 是否首次登录（需修改密码）
     last_login_at = Column(DateTime, nullable=True)
     last_login_ip = Column(String(50), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)

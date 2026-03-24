@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { MessageSquare, FileText, User, LogOut, Bell, Settings, ChevronLeft } from "lucide-react";
+import { MessageSquare, FileText, User, LogOut, Bell, Settings, ChevronLeft, Edit3 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useUserAuth } from "../../contexts/AuthContext";
@@ -54,6 +54,17 @@ export function CSideLayout() {
             <span className="absolute left-14 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">我的合同</span>
           </Link>
 
+          <Link
+            to="/drafts"
+            className={cn(
+              "w-10 h-10 rounded-lg flex items-center justify-center transition-all group relative",
+              location.pathname === "/drafts" ? "bg-blue-50 text-blue-600 border border-blue-200" : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+            )}
+          >
+            <Edit3 className="w-5 h-5" />
+            <span className="absolute left-14 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">草稿夹</span>
+          </Link>
+
           <div className="h-px w-6 bg-slate-200 my-2" />
 
           <button className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all group relative">
@@ -90,7 +101,7 @@ export function CSideLayout() {
              )}
              <div>
                 <h1 className="text-lg font-bold text-slate-900 leading-tight">
-                  {location.pathname === "/" ? "法律助手 AI" : location.pathname === "/history" ? "合同中心" : "详情"}
+                  {location.pathname === "/" ? "法律助手 AI" : location.pathname === "/history" ? "合同中心" : location.pathname === "/drafts" ? "草稿夹" : "详情"}
                 </h1>
                 {location.pathname === "/" && (
                    <p className="text-xs text-green-600 font-medium flex items-center gap-1">

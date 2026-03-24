@@ -10,14 +10,17 @@ import {
   Gavel,
   History,
   MessageSquare,
-  AlertCircle
+  AlertCircle,
+  FileCheck,
+  Download
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useUserAuth } from "../../contexts/AuthContext";
+import { ContractTemplateEditor } from "../../components/ContractTemplateEditor";
 
 const API_BASE_URL = "http://localhost:8001";
 
@@ -33,13 +36,24 @@ interface Message {
   id: string;
   role: "bot" | "user";
   content: string;
-  type?: "text" | "contract_upload" | "report_summary" | "form";
+  type?: "text" | "contract_form" | "contract_result";
   metadata?: any;
   timestamp: Date;
 }
 
+interface ContractFormData {
+  contract_type: string;
+  contract_type_name: string;
+  has_template: boolean;
+  template_id: number | null;
+  fields: any[];
+  greeting: string;
+  template_content?: string;
+}
+
 export function AgentChat() {
   const { user } = useUserAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -51,6 +65,11 @@ export function AgentChat() {
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null);
+  const [currentForm, setCurrentForm] = useState<ContractFormData | null>(null);
+  const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  const [loadedDraft, setLoadedDraft] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -72,6 +91,128 @@ export function AgentChat() {
     };
     checkLLM();
   }, []);
+
+  // 检查未完成的草稿
+  useEffect(() => {
+    const checkPendingDraft = async () => {
+      try {
+        const token = localStorage.getItem("user_token");
+        if (!token) return;
+
+        // 检查URL参数中是否有指定的草稿ID
+        const draftIdFromUrl = searchParams.get('draft');
+
+        if (draftIdFromUrl) {
+          // 从草稿夹跳转过来，加载指定草稿
+          const response = await fetch(`${API_BASE_URL}/api/contract-drafts/${draftIdFromUrl}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+
+          if (response.ok) {
+            const draft = await response.json();
+            if (draft && draft.status === 'draft') {
+              setCurrentDraftId(draft.id);
+              setDraftValues(draft.field_values || {});
+              setLoadedDraft(draft);
+              setShowDraftPrompt(true);
+              // 清除URL参数
+              setSearchParams({});
+            }
+          }
+          return;
+        }
+
+        // 没有指定草稿，检查是否有未完成的草稿
+        const response = await fetch(`${API_BASE_URL}/api/contract-drafts/pending`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const draft = await response.json();
+          if (draft) {
+            setCurrentDraftId(draft.id);
+            setDraftValues(draft.field_values || {});
+            setLoadedDraft(draft);
+            setShowDraftPrompt(true);
+          }
+        }
+      } catch (error) {
+        console.error("检查草稿失败:", error);
+      }
+    };
+    checkPendingDraft();
+  }, [searchParams]);
+
+  // 恢复草稿
+  const handleRestoreDraft = async () => {
+    if (currentDraftId) {
+      try {
+        const token = localStorage.getItem("user_token");
+        // 获取完整的草稿信息（包括模板内容）
+        const response = await fetch(`${API_BASE_URL}/api/contract-drafts/${currentDraftId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const draft = await response.json();
+
+          // 获取模板内容（使用公开接口）
+          let templateContent = '';
+          try {
+            const templateResponse = await fetch(`${API_BASE_URL}/api/contract-drafts/template/${encodeURIComponent(draft.contract_type)}`);
+            if (templateResponse.ok) {
+              const templateData = await templateResponse.json();
+              templateContent = templateData.content || '';
+            }
+          } catch (e) {
+            console.warn("获取模板失败:", e);
+          }
+
+          // 设置表单数据
+          setCurrentForm({
+            contract_type: draft.contract_type,
+            contract_type_name: draft.contract_type,
+            has_template: !!templateContent,
+            template_id: draft.template_id,
+            fields: draft.fields_definition || [],
+            greeting: "检测到您有未完成的合同草稿，请继续填写：",
+            template_content: templateContent
+          });
+          setCurrentDraftId(draft.id);
+          setDraftValues(draft.field_values || {});
+
+          // 添加一条消息显示表单
+          const formMsgId = generateId();
+          setMessages(prev => [...prev, {
+            id: formMsgId,
+            role: "bot",
+            content: "检测到您有未完成的合同草稿，请继续填写：",
+            type: "contract_form",
+            metadata: {
+              contract_type: draft.contract_type,
+              contract_type_name: draft.contract_type,
+              template_content: templateContent,
+              fields: draft.fields_definition || [],
+              has_template: !!templateContent,
+              template_id: draft.template_id
+            },
+            timestamp: new Date(),
+          }]);
+        }
+      } catch (error) {
+        console.error("恢复草稿失败:", error);
+        toast.error("恢复草稿失败");
+      }
+    }
+    setShowDraftPrompt(false);
+  };
+
+  // 忽略草稿
+  const handleIgnoreDraft = async () => {
+    setShowDraftPrompt(false);
+    setCurrentDraftId(null);
+    setDraftValues({});
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -145,6 +286,26 @@ export function AgentChat() {
                   setMessages(prev => prev.map(m =>
                     m.id === botMsgId ? { ...m, content: `错误: ${data.error}` } : m
                   ));
+                } else if (data.type === 'contract_form') {
+                  // 合同表单类型
+                  setMessages(prev => prev.map(m =>
+                    m.id === botMsgId ? {
+                      ...m,
+                      type: 'contract_form',
+                      content: data.form.greeting,
+                      metadata: data.form
+                    } : m
+                  ));
+                } else if (data.type === 'contract_result') {
+                  // 合同生成结果
+                  setMessages(prev => prev.map(m =>
+                    m.id === botMsgId ? {
+                      ...m,
+                      type: 'contract_result',
+                      content: data.content,
+                      metadata: data.metadata
+                    } : m
+                  ));
                 } else if (data.done) {
                   // 流式传输完成
                 } else if (data.content) {
@@ -193,6 +354,38 @@ export function AgentChat() {
 
   const handleUpload = () => {
     toast.info("合同上传功能开发中...");
+  };
+
+  // 处理表单保存
+  const handleFormSave = (values: Record<string, string>) => {
+    setDraftValues(values);
+  };
+
+  // 处理表单提交
+  const handleFormSubmit = (values: Record<string, string>) => {
+    // 添加用户填写信息作为消息
+    const formSummary = Object.entries(values)
+      .filter(([_, v]) => v)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('\n');
+
+    // 添加成功消息
+    const successMsg: Message = {
+      id: generateId(),
+      role: "bot",
+      content: "合同已生成成功！您可以在「我的合同」中查看和下载。",
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, successMsg]);
+    setCurrentForm(null);
+    setCurrentDraftId(null);
+    setDraftValues({});
+  };
+
+  // 取消表单
+  const handleFormCancel = () => {
+    setCurrentForm(null);
   };
 
   return (
@@ -254,6 +447,42 @@ export function AgentChat() {
       <div className="flex-1 flex flex-col h-full bg-white lg:bg-slate-50/30">
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8">
+          {/* 草稿恢复提示 */}
+          <AnimatePresence>
+            {showDraftPrompt && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="max-w-2xl mx-auto bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-bold text-amber-900">检测到未完成的合同草稿</h4>
+                    <p className="text-sm text-amber-700 mt-1">
+                      您有一份未完成的合同草稿，是否继续填写？
+                    </p>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={handleRestoreDraft}
+                        className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+                      >
+                        继续填写
+                      </button>
+                      <button
+                        onClick={handleIgnoreDraft}
+                        className="px-4 py-2 bg-white text-amber-700 border border-amber-300 rounded-lg text-sm font-medium hover:bg-amber-50 transition-colors"
+                      >
+                        开始新对话
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <AnimatePresence>
             {messages.map((msg) => (
               <motion.div
@@ -273,18 +502,58 @@ export function AgentChat() {
                 </div>
 
                 <div className={cn("flex flex-col gap-2", msg.role === "user" ? "items-end" : "items-start")}>
-                  <div className={cn(
-                    "p-4 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap",
-                    msg.role === "user" ? "bg-slate-900 text-white" : "bg-white border border-slate-100 text-slate-800"
-                  )}>
-                    {msg.content || (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" />
-                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.2s]" />
-                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.4s]" />
+                  {/* 合同模板类型 */}
+                  {msg.type === 'contract_form' && msg.metadata ? (
+                    <ContractTemplateEditor
+                      contractType={msg.metadata.contract_type}
+                      contractTypeName={msg.metadata.contract_type_name}
+                      templateContent={msg.metadata.template_content || ''}
+                      fields={msg.metadata.fields || []}
+                      draftId={currentDraftId || undefined}
+                      draftValues={draftValues}
+                      onSaveDraft={handleFormSave}
+                      onSubmit={handleFormSubmit}
+                      onCancel={handleFormCancel}
+                    />
+                  ) : msg.type === 'contract_result' ? (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-lg max-w-lg">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                          <FileCheck className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900">合同生成成功</h4>
+                          <p className="text-sm text-slate-500">合同编号: {msg.metadata?.contract_no}</p>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                      <div className="flex gap-2">
+                        <Link
+                          to="/my-contracts"
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                        >
+                          <FileText className="w-4 h-4" />
+                          查看合同
+                        </Link>
+                        <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors">
+                          <Download className="w-4 h-4" />
+                          下载
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      "p-4 rounded-2xl shadow-sm text-sm leading-relaxed whitespace-pre-wrap",
+                      msg.role === "user" ? "bg-slate-900 text-white" : "bg-white border border-slate-100 text-slate-800"
+                    )}>
+                      {msg.content || (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" />
+                          <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.2s]" />
+                          <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce [animation-delay:0.4s]" />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <span className="text-[10px] text-slate-400 font-medium px-2">
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

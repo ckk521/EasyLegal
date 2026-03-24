@@ -17,8 +17,8 @@ class User(Base):
     status = Column(String(20), nullable=False, default="active")  # active, disabled, deleted
     last_login_at = Column(DateTime, nullable=True)
     last_login_ip = Column(String(50), nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}')>"

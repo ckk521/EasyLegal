@@ -18,10 +18,9 @@ node_modules/
 
 # Build outputs
 frontend/dist/
-backend/data/*.db
+backend/data/
 
 # Embedding models (downloaded at runtime, ~400MB)
-backend/data/embedding_models/
 
 # Environment
 .env

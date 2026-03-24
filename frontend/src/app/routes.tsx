@@ -8,6 +8,7 @@ import { CSideLayout } from "./pages/c-side/CSideLayout";
 import { AgentChat } from "./pages/c-side/AgentChat";
 import { MyContracts } from "./pages/c-side/MyContracts";
 import { ReportView } from "./pages/c-side/ReportView";
+import { DraftsFolder } from "./pages/c-side/DraftsFolder";
 
 // B端页面
 import { StaffLoginPage } from "./pages/b-side/StaffLoginPage";
@@ -24,12 +25,15 @@ const userRoutes = {
   path: "/",
   element: (
     <UserAuthProvider>
-      <CSideLayout />
+      <UserAuthGuard>
+        <CSideLayout />
+      </UserAuthGuard>
     </UserAuthProvider>
   ),
   children: [
     { index: true, element: <AgentChat /> },
     { path: "history", element: <MyContracts /> },
+    { path: "drafts", element: <DraftsFolder /> },
     { path: "report/:id", element: <ReportView /> },
   ],
 };

@@ -18,8 +18,8 @@ class LLMConfig(Base):
     api_type = Column(String(50), nullable=False, default="openai-completions", comment="API类型")
     is_active = Column(Boolean, default=True, comment="是否启用")
     last_verified_at = Column(DateTime, nullable=True, comment="最后验证时间")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
 
 class EmbeddingConfig(Base):
@@ -32,8 +32,8 @@ class EmbeddingConfig(Base):
     chunk_size = Column(Integer, nullable=False, default=512, comment="Chunk大小")
     chunk_overlap = Column(Integer, nullable=False, default=50, comment="重叠大小")
     is_active = Column(Boolean, default=True, comment="是否启用")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
 
 class LegalScopeConfig(Base):
@@ -46,8 +46,8 @@ class LegalScopeConfig(Base):
     allowed_topics = Column(Text, nullable=True, comment="允许的主题(JSON数组)")
     forbidden_topics = Column(Text, nullable=True, comment="禁止的主题(JSON数组)")
     is_active = Column(Boolean, default=True, comment="是否启用")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
 
 class RejectScriptConfig(Base):
@@ -59,8 +59,8 @@ class RejectScriptConfig(Base):
     rejection_message = Column(Text, nullable=False, comment="拒绝话术")
     redirect_template = Column(Text, nullable=True, comment="引导话术模板")
     is_active = Column(Boolean, default=True, comment="是否启用")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
 
 class IntentConfig(Base):
@@ -74,5 +74,5 @@ class IntentConfig(Base):
     response_template = Column(Text, nullable=True, comment="响应模板")
     priority = Column(Integer, default=0, comment="优先级(数字越大优先级越高)")
     is_active = Column(Boolean, default=True, comment="是否启用")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)

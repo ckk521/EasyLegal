@@ -29,8 +29,8 @@ class Document(Base):
     chunk_count = Column(Integer, default=0, comment="向量块数量")
     is_indexed = Column(Boolean, default=False, comment="是否已索引到向量库")
     description = Column(Text, nullable=True, comment="描述")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
 
 class Template(Base):
@@ -47,8 +47,8 @@ class Template(Base):
     field_definition_id = Column(Integer, nullable=True, comment="关联的字段定义ID")
     is_active = Column(Boolean, default=True, comment="是否启用")
     description = Column(Text, nullable=True, comment="描述")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
 
 class FieldDefinition(Base):
@@ -60,8 +60,8 @@ class FieldDefinition(Base):
     contract_type = Column(String(100), nullable=False, comment="合同类型")
     fields = Column(Text, nullable=False, comment="字段定义(JSON)")
     is_active = Column(Boolean, default=True, comment="是否启用")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
 
 
 class Contract(Base):
@@ -79,5 +79,5 @@ class Contract(Base):
     content = Column(Text, nullable=True, comment="合同内容")
     file_path = Column(String(500), nullable=True, comment="导出文件路径")
     session_id = Column(Integer, nullable=True, comment="关联的会话ID")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
