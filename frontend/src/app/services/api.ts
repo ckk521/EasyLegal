@@ -2,7 +2,7 @@
  * API 服务层 - 与后端交互
  */
 
-const API_BASE_URL = 'http://localhost:8001';
+const API_BASE_URL = 'http://localhost:8000';
 
 interface ApiResponse<T> {
   success?: boolean;
@@ -368,9 +368,14 @@ export interface IntentConfigInput {
 }
 
 export const configApi = {
-  // 获取LLM配置
+  // 获取当前激活的LLM配置
   getLLMConfig: async (): Promise<LLMConfig> => {
     return request('/api/admin/config/llm');
+  },
+
+  // 获取所有LLM配置列表
+  listLLMConfigs: async (): Promise<LLMConfig[]> => {
+    return request('/api/admin/config/llm/list');
   },
 
   // 创建LLM配置
@@ -381,7 +386,34 @@ export const configApi = {
     });
   },
 
-  // 更新LLM配置
+  // 获取指定LLM配置
+  getLLMConfigById: async (id: number): Promise<LLMConfig> => {
+    return request(`/api/admin/config/llm/${id}`);
+  },
+
+  // 更新指定LLM配置
+  updateLLMConfigById: async (id: number, data: Partial<LLMConfigInput>): Promise<LLMConfig> => {
+    return request(`/api/admin/config/llm/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 激活指定LLM配置
+  activateLLMConfig: async (id: number): Promise<{ message: string; config: LLMConfig }> => {
+    return request(`/api/admin/config/llm/${id}/activate`, {
+      method: 'PUT',
+    });
+  },
+
+  // 删除指定LLM配置
+  deleteLLMConfig: async (id: number): Promise<{ message: string }> => {
+    return request(`/api/admin/config/llm/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // 更新LLM配置（兼容旧API）
   updateLLMConfig: async (data: Partial<LLMConfigInput>): Promise<LLMConfig> => {
     return request('/api/admin/config/llm', {
       method: 'PUT',
@@ -720,5 +752,37 @@ export const contractDraftApi = {
     has_field_definition: boolean;
   }>> => {
     return request('/api/contract-drafts/types');
+  },
+
+  // 获取合同详情内容
+  getContractContent: async (contractId: number): Promise<{
+    id: number;
+    contract_no: string;
+    contract_type: string;
+    title: string | null;
+    status: string;
+    content: string;
+    field_values: Record<string, string>;
+    created_at: string;
+    updated_at: string;
+  }> => {
+    return request(`/api/contract-drafts/${contractId}/content`);
+  },
+
+  // 导出合同 (仅支持PDF)
+  exportContract: async (contractId: number, format: string = 'pdf'): Promise<Blob> => {
+    const token = localStorage.getItem('user_token');
+    const response = await fetch(`${API_BASE_URL}/api/contract-drafts/${contractId}/export?format=${format}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || '导出失败');
+    }
+
+    return response.blob();
   },
 };

@@ -24,7 +24,7 @@ import { Link, useSearchParams } from "react-router";
 import { useUserAuth } from "../../contexts/AuthContext";
 import { ContractTemplateEditor } from "../../components/ContractTemplateEditor";
 
-const API_BASE_URL = "http://localhost:8002";
+const API_BASE_URL = "http://localhost:8000";
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
@@ -91,6 +91,7 @@ export function AgentChat() {
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   const [loadedDraft, setLoadedDraft] = useState<any>(null);
+  const isFromDraftsFolderRef = useRef(false); // 使用 ref 标记是否从草稿夹跳转，避免触发重新渲染
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -241,6 +242,9 @@ export function AgentChat() {
   // 检查未完成的草稿
   useEffect(() => {
     const checkPendingDraft = async () => {
+      // 如果已经从草稿夹加载过，跳过
+      if (isFromDraftsFolderRef.current) return;
+
       try {
         const token = localStorage.getItem("user_token");
         if (!token) return;
@@ -249,7 +253,8 @@ export function AgentChat() {
         const draftIdFromUrl = searchParams.get('draft');
 
         if (draftIdFromUrl) {
-          // 从草稿夹跳转过来，加载指定草稿
+          // 从草稿夹跳转过来，直接加载指定草稿（不显示提示）
+          isFromDraftsFolderRef.current = true;
           const response = await fetch(`${API_BASE_URL}/api/contract-drafts/${draftIdFromUrl}`, {
             headers: { Authorization: `Bearer ${token}` }
           });
@@ -257,10 +262,8 @@ export function AgentChat() {
           if (response.ok) {
             const draft = await response.json();
             if (draft && draft.status === 'draft') {
-              setCurrentDraftId(draft.id);
-              setDraftValues(draft.field_values || {});
-              setLoadedDraft(draft);
-              setShowDraftPrompt(true);
+              // 直接加载草稿，不显示提示
+              await loadDraftDirectly(draft);
               // 清除URL参数
               setSearchParams({});
             }
@@ -268,7 +271,7 @@ export function AgentChat() {
           return;
         }
 
-        // 没有指定草稿，检查是否有未完成的草稿
+        // 没有指定草稿，检查是否有未完成的草稿（页面刷新情况）
         const response = await fetch(`${API_BASE_URL}/api/contract-drafts/pending`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -279,7 +282,7 @@ export function AgentChat() {
             setCurrentDraftId(draft.id);
             setDraftValues(draft.field_values || {});
             setLoadedDraft(draft);
-            setShowDraftPrompt(true);
+            setShowDraftPrompt(true); // 页面刷新检测到草稿，显示提示
           }
         }
       } catch (error) {
@@ -289,92 +292,68 @@ export function AgentChat() {
     checkPendingDraft();
   }, [searchParams]);
 
-  // 恢复草稿
-  const handleRestoreDraft = async () => {
-    if (currentDraftId) {
-      try {
-        const token = localStorage.getItem("user_token");
-        // 获取完整的草稿信息（包括模板内容）
-        const response = await fetch(`${API_BASE_URL}/api/contract-drafts/${currentDraftId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (response.ok) {
-          const draft = await response.json();
-
-          // 如果草稿有关联的会话ID，先加载该会话的历史
-          if (draft.session_id) {
-            await loadSessionHistory(draft.session_id);
-          }
-
-          // 获取模板内容（使用公开接口）
-          let templateContent = '';
-          try {
-            const templateResponse = await fetch(`${API_BASE_URL}/api/contract-drafts/template/${encodeURIComponent(draft.contract_type)}`);
-            if (templateResponse.ok) {
-              const templateData = await templateResponse.json();
-              templateContent = templateData.content || '';
-            }
-          } catch (e) {
-            console.warn("获取模板失败:", e);
-          }
-
-          // 设置表单数据
-          setCurrentForm({
-            contract_type: draft.contract_type,
-            contract_type_name: draft.contract_type,
-            has_template: !!templateContent,
-            template_id: draft.template_id,
-            fields: draft.fields_definition || [],
-            greeting: "检测到您有未完成的合同草稿，请继续填写：",
-            template_content: templateContent
-          });
-          setCurrentDraftId(draft.id);
-          setDraftValues(draft.field_values || {});
-
-          // 如果没有关联会话，添加一条消息显示表单
-          if (!draft.session_id) {
-            const formMsgId = generateId();
-            setMessages(prev => [...prev, {
-              id: formMsgId,
-              role: "bot",
-              content: "检测到您有未完成的合同草稿，请继续填写：",
-              type: "contract_form",
-              metadata: {
-                contract_type: draft.contract_type,
-                contract_type_name: draft.contract_type,
-                template_content: templateContent,
-                fields: draft.fields_definition || [],
-                has_template: !!templateContent,
-                template_id: draft.template_id
-              },
-              timestamp: new Date(),
-            }]);
-          } else {
-            // 有关联会话，在历史消息后追加表单
-            const formMsgId = generateId();
-            setMessages(prev => [...prev, {
-              id: formMsgId,
-              role: "bot",
-              content: "继续填写您的合同草稿：",
-              type: "contract_form",
-              metadata: {
-                contract_type: draft.contract_type,
-                contract_type_name: draft.contract_type,
-                template_content: templateContent,
-                fields: draft.fields_definition || [],
-                has_template: !!templateContent,
-                template_id: draft.template_id
-              },
-              timestamp: new Date(),
-            }]);
-          }
-        }
-      } catch (error) {
-        console.error("恢复草稿失败:", error);
-        toast.error("恢复草稿失败");
+  // 直接加载草稿（从草稿夹跳转时使用）
+  const loadDraftDirectly = async (draft: any) => {
+    try {
+      // 如果草稿有关联的会话ID，先加载该会话的历史
+      if (draft.session_id) {
+        await loadSessionHistory(draft.session_id);
       }
+
+      // 获取模板内容
+      let templateContent = '';
+      try {
+        const templateResponse = await fetch(`${API_BASE_URL}/api/contract-drafts/template/${encodeURIComponent(draft.contract_type)}`);
+        if (templateResponse.ok) {
+          const templateData = await templateResponse.json();
+          templateContent = templateData.content || '';
+        }
+      } catch (e) {
+        console.warn("获取模板失败:", e);
+      }
+
+      // 设置表单数据
+      setCurrentForm({
+        contract_type: draft.contract_type,
+        contract_type_name: draft.contract_type,
+        has_template: !!templateContent,
+        template_id: draft.template_id,
+        fields: draft.fields_definition || [],
+        greeting: "继续填写您的合同草稿：",
+        template_content: templateContent
+      });
+      setCurrentDraftId(draft.id);
+      setDraftValues(draft.field_values || {});
+
+      // 添加消息显示表单
+      const formMsgId = generateId();
+      setMessages(prev => [...prev, {
+        id: formMsgId,
+        role: "bot",
+        content: "您选择的合同草稿已加载，请继续填写：",
+        type: "contract_form",
+        metadata: {
+          contract_type: draft.contract_type,
+          contract_type_name: draft.contract_type,
+          template_content: templateContent,
+          fields: draft.fields_definition || [],
+          has_template: !!templateContent,
+          template_id: draft.template_id,
+          draft_id: draft.id,  // 每条消息携带自己的草稿ID
+          draft_values: draft.field_values || {}  // 每条消息携带自己的草稿值
+        },
+        timestamp: new Date(),
+      }]);
+    } catch (error) {
+      console.error("加载草稿失败:", error);
+      toast.error("加载草稿失败");
     }
+  };
+
+  // 恢复草稿（用户点击"继续填写"按钮）
+  const handleRestoreDraft = async () => {
+    if (!loadedDraft) return;
+    await loadDraftDirectly(loadedDraft);
     setShowDraftPrompt(false);
   };
 
@@ -899,8 +878,8 @@ export function AgentChat() {
                       contractTypeName={msg.metadata.contract_type_name}
                       templateContent={msg.metadata.template_content || ''}
                       fields={msg.metadata.fields || []}
-                      draftId={currentDraftId || undefined}
-                      draftValues={draftValues}
+                      draftId={msg.metadata.draft_id || undefined}
+                      draftValues={msg.metadata.draft_values || {}}
                       sessionId={currentSessionId || undefined}
                       onSaveDraft={handleFormSave}
                       onSubmit={handleFormSubmit}

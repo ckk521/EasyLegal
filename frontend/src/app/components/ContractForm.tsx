@@ -11,7 +11,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { toast } from 'sonner';
 
-const API_BASE_URL = 'http://localhost:8002';
+const API_BASE_URL = 'http://localhost:8000';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
