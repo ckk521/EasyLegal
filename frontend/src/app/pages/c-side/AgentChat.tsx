@@ -632,11 +632,6 @@ export function AgentChat() {
     setDraftValues({});
   };
 
-  // 取消表单
-  const handleFormCancel = () => {
-    setCurrentForm(null);
-  };
-
   return (
     <div className="flex h-full bg-slate-50 relative overflow-hidden">
       {/* Sidebar - Recent Conversations */}
@@ -883,7 +878,6 @@ export function AgentChat() {
                       sessionId={currentSessionId || undefined}
                       onSaveDraft={handleFormSave}
                       onSubmit={handleFormSubmit}
-                      onCancel={handleFormCancel}
                     />
                   ) : msg.type === 'contract_result' ? (
                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-lg max-w-lg">

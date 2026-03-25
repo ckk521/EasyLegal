@@ -32,7 +32,6 @@ interface ContractTemplateEditorProps {
   sessionId?: number;  // 当前会话ID
   onSaveDraft: (values: Record<string, string>) => void;
   onSubmit: (values: Record<string, string>) => void;
-  onCancel: () => void;
 }
 
 export function ContractTemplateEditor({
@@ -44,8 +43,7 @@ export function ContractTemplateEditor({
   draftValues = {},
   sessionId,
   onSaveDraft,
-  onSubmit,
-  onCancel
+  onSubmit
 }: ContractTemplateEditorProps) {
   const [values, setValues] = useState<Record<string, string>>(draftValues);
   const [errors, setErrors] = useState<Set<string>>(new Set());
@@ -318,44 +316,34 @@ export function ContractTemplateEditor({
 
       {/* 底部操作栏 */}
       <div className="bg-slate-50 border border-slate-200 border-t-0 rounded-b-2xl p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-end gap-3">
           <button
             type="button"
-            onClick={onCancel}
-            className="px-4 py-2.5 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            onClick={() => handleSaveDraft()}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
-            取消
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            保存草稿
           </button>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => handleSaveDraft()}
-              disabled={isSaving}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
-            >
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              保存草稿
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-lg shadow-blue-600/25"
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <CheckCircle className="w-4 h-4" />
-              )}
-              生成合同
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-lg shadow-blue-600/25"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4" />
+            )}
+            生成合同
+          </button>
         </div>
       </div>
     </div>
