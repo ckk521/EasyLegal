@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db, SessionLocal
 from app.services.staff_service import StaffService
-from app.api import auth, admin, staff_auth, config, chat, document, contract_draft
+from app.api import auth, admin, staff_auth, config, chat, document, contract_draft, contract_config, contract_review
 
 
 @asynccontextmanager
@@ -21,6 +21,12 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         StaffService.create_admin_if_not_exists(db)
+
+        # 预加载 Embedding 模型（避免第一次请求慢）
+        print("Preloading embedding model...")
+        from app.services.rag_service import RAGService
+        RAGService.get_embeddings(db)
+        print("Embedding model loaded.")
     finally:
         db.close()
 
@@ -54,6 +60,8 @@ app.include_router(config.router)      # 配置管理
 app.include_router(chat.router)        # C端对话
 app.include_router(document.router)    # 文档管理
 app.include_router(contract_draft.router)  # 合同草稿
+app.include_router(contract_config.router)  # 合同配置管理
+app.include_router(contract_review.router)  # 合同审核
 
 
 @app.get("/")
