@@ -73,12 +73,20 @@ class ChatService:
 
     @staticmethod
     def load_session_history(db: Session, session_id: int, limit: int = 50) -> List[dict]:
-        """加载会话历史消息"""
+        """加载会话历史消息（包含元数据）"""
         messages = db.query(ChatMessage).filter(
             ChatMessage.session_id == session_id
         ).order_by(ChatMessage.created_at.asc()).limit(limit).all()
 
-        return [{"role": m.role, "content": m.content} for m in messages]
+        result = []
+        for m in messages:
+            msg_dict = {"role": m.role, "content": m.content}
+            # 包含元数据（工具调用结果等）
+            if m.meta_data:
+                msg_dict["metadata"] = m.meta_data
+            result.append(msg_dict)
+
+        return result
 
     @staticmethod
     def get_user_sessions(db: Session, user_id: int, limit: int = 20) -> List[dict]:
@@ -254,11 +262,8 @@ class ChatService:
             # 运行智能体
             result = await agent.run_with_tools(user_message, history)
 
-            # 发送文本回复
-            if result.get("content"):
-                yield f"data: {json.dumps({'content': result['content']}, ensure_ascii=False)}\n\n"
-
             # 处理工具调用结果
+            has_tool_action = False
             if result.get("tool_results"):
                 for tool_result in result["tool_results"]:
                     if tool_result.get("success") and tool_result.get("result"):
@@ -269,10 +274,11 @@ class ChatService:
                             action = tool_data.get("action")
                             data = tool_data.get("data", {})
 
-                            # 如果没有文本内容，根据工具结果生成默认回复
-                            if not result.get("content"):
-                                default_message = data.get("message", "好的，请继续。")
-                                yield f"data: {json.dumps({'content': default_message}, ensure_ascii=False)}\n\n"
+                            # 标记有工具 action 处理
+                            has_tool_action = True
+
+                            # 工具返回的默认消息
+                            default_message = data.get("message", "好的，请继续。")
 
                             # 合同相关表单
                             if action == "collect_contract_info":
@@ -290,6 +296,26 @@ class ChatService:
                             elif action == "no_template_available":
                                 yield f"data: {json.dumps({'type': 'no_template', 'data': data}, ensure_ascii=False)}\n\n"
 
+                            # 单模板自动选择 - 直接获取表单
+                            elif action == "auto_select_template":
+                                # 获取模板ID，调用 get_contract_form
+                                template_id = data.get("template_id")
+                                contract_type = data.get("contract_type")
+                                if template_id:
+                                    from app.agents.tools.contract_tools import execute_get_contract_form
+                                    form_result = execute_get_contract_form(contract_type, template_id, db=db)
+                                    if form_result.get("success") and form_result.get("data"):
+                                        yield f"data: {json.dumps({'type': 'contract_form', 'form': form_result['data']}, ensure_ascii=False)}\n\n"
+                                    else:
+                                        # 获取表单失败，返回错误提示
+                                        yield f"data: {json.dumps({'type': 'no_template', 'data': data}, ensure_ascii=False)}\n\n"
+                                else:
+                                    yield f"data: {json.dumps({'type': 'template_list', 'data': data}, ensure_ascii=False)}\n\n"
+
+                            # 表单请求时无模板
+                            elif action == "no_template_for_form":
+                                yield f"data: {json.dumps({'type': 'no_template', 'data': data}, ensure_ascii=False)}\n\n"
+
                             # 草稿保存成功
                             elif action == "draft_saved":
                                 yield f"data: {json.dumps({'type': 'draft_saved', 'data': data}, ensure_ascii=False)}\n\n"
@@ -305,6 +331,10 @@ class ChatService:
                             # RAG检索结果
                             elif action == "rag_search_result":
                                 yield f"data: {json.dumps({'type': 'rag_result', 'data': data}, ensure_ascii=False)}\n\n"
+
+            # 如果没有工具 action 处理，发送文本回复
+            if not has_tool_action and result.get("content"):
+                yield f"data: {json.dumps({'content': result['content']}, ensure_ascii=False)}\n\n"
 
             yield f"data: {json.dumps({'done': True}, ensure_ascii=False)}\n\n"
 

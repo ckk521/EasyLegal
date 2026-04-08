@@ -74,6 +74,38 @@ class BaseAgent(ABC):
             return self.llm.bind_tools(tools)
         return self.llm
 
+    def _format_metadata_context(self, metadata: Dict[str, Any]) -> str:
+        """
+        格式化元数据为上下文文本
+
+        将工具调用结果转换为可读的上下文信息，帮助LLM理解对话状态。
+        """
+        if not metadata:
+            return ""
+
+        context_parts = []
+
+        # 合同类型选择结果
+        if metadata.get("type") == "contract_type_selection":
+            types = metadata.get("available_types", [])
+            if types:
+                type_names = [t.get("type", t) if isinstance(t, dict) else t for t in types]
+                context_parts.append(f"已展示合同类型选项: {', '.join(type_names)}")
+
+        # 模板列表结果
+        if metadata.get("type") == "template_list":
+            templates = metadata.get("templates", [])
+            contract_type = metadata.get("contract_type", "")
+            if templates:
+                context_parts.append(f"已展示{contract_type}模板列表，共{len(templates)}个模板可供选择")
+
+        # 合同表单
+        if metadata.get("type") == "contract_form":
+            contract_type = metadata.get("contract_type", "")
+            context_parts.append(f"已展示{contract_type}填写表单")
+
+        return "；".join(context_parts)
+
     def _inject_context_to_tools(self):
         """
         将上下文注入到工具函数中
@@ -118,13 +150,21 @@ class BaseAgent(ABC):
         # 构建消息
         messages = [SystemMessage(content=self.system_prompt)]
 
-        # 添加历史
+        # 添加历史（包含元数据上下文）
         if history:
             for msg in history:
+                content = msg.get("content", "")
+                metadata = msg.get("metadata", {})
+
                 if msg.get("role") == "user":
-                    messages.append(HumanMessage(content=msg.get("content", "")))
+                    messages.append(HumanMessage(content=content))
                 elif msg.get("role") == "assistant":
-                    messages.append(AIMessage(content=msg.get("content", "")))
+                    # 如果有元数据，把关键上下文信息加入消息
+                    if metadata:
+                        context_info = self._format_metadata_context(metadata)
+                        if context_info:
+                            content = f"{content}\n\n[系统上下文: {context_info}]"
+                    messages.append(AIMessage(content=content))
 
         # 添加当前输入
         messages.append(HumanMessage(content=user_input))
